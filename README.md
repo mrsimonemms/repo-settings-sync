@@ -7,6 +7,8 @@
   * [Customisation](#customisation)
     * [Ignoring](#ignoring)
     * [Repo](#repo)
+    * [Branch Protection Settings](#branch-protection-settings)
+      * [required_status_checks](#required_status_checks)
 * [Contributing](#contributing)
   * [Open in Gitpod](#open-in-gitpod)
   * [Open in devbox](#open-in-devbox)
@@ -62,7 +64,25 @@ Sometimes, you don't want a repository to be managed. In that case, just set you
 
 #### Repo
 
-Anything in the `repo` is added to the body for [updating a repository's settings](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#update-a-repository).
+Anything in the `repo` section is added to the body for
+[updating a repository's settings](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#update-a-repository).
+
+#### Branch Protection Settings
+
+Anything in the `branch_protection` section is added to the body for
+[updating branch protection](https://docs.github.com/en/rest/branches/branch-protection?apiVersion=2022-11-28#update-branch-protection).
+
+##### required_status_checks
+
+The `required_status_checks` are a required field in the API endpoint. This is
+problematic for us as this is highly nuanced on a per-repository basis.
+
+The default settings are that the branches must be up to date, but there are
+no checks added. If you manually add a check in via the GitHub settings page,
+this will be persisted.
+
+If you add any configuration in your `.github-settings.json` file, these will
+take priority over the GitHub settings page.
 
 ## Contributing
 
