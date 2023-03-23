@@ -15,6 +15,22 @@ TMP_DIR="/tmp/repo-settings-sync"
 
 mkdir -p "${TMP_DIR}"
 
+apply_branch_protection() {
+  TOKEN="${1}"
+  REPO="${2}"
+  SETTINGS="${3}"
+
+  default_branch=$(get_default_branch "${TOKEN}" "${REPO}")
+
+  curl -fL \
+    -X PUT \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${TOKEN}"\
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "https://api.github.com/repos/${REPO}/branches/${default_branch}/protection" \
+    -d "${SETTINGS}"
+}
+
 apply_repo_update() {
   TOKEN="${1}"
   REPO="${2}"
@@ -61,6 +77,18 @@ get_all_repos() {
   jq -s add ${dir}/*.json | jq -Mcr 'to_entries | map(select(.value.archived == false) | select(.value.disabled == false) | .value.full_name)'
 }
 
+get_default_branch() {
+  TOKEN="${1}"
+  REPO="${2}"
+
+  # Get the default branch
+  curl -sfL \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "https://api.github.com/repos/${REPO}" | jq -r '.default_branch'
+}
+
 get_file_from_repo() {
   TOKEN="${1}"
   REPO="${2}"
@@ -73,11 +101,28 @@ get_file_from_repo() {
     "https://api.github.com/repos/${REPO}/contents/${FILE_PATH}"
 }
 
+get_required_status_checks() {
+  TOKEN="${1}"
+  REPO="${2}"
+
+  default_branch=$(get_default_branch "${TOKEN}" "${REPO}")
+
+  # This may return a 404 if branch not protected
+  curl -sfL \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "https://api.github.com/repos/${REPO}/branches/${default_branch}/protection/required_status_checks"
+}
+
 ############
 # Commands #
 ############
 
 case "${CMD}" in
+  apply_branch_protection )
+    apply_branch_protection "${2}" "${3}" "${4}" # Token, repo, settings
+    ;;
   apply_repo_update )
     apply_repo_update "${2}" "${3}" "${4}" # Token, repo, settings
     ;;
@@ -86,6 +131,9 @@ case "${CMD}" in
     ;;
   get_file_from_repo )
     get_file_from_repo "${2}" "${3}" "${4}" # Token, repo, file path
+    ;;
+  get_required_status_checks )
+    get_required_status_checks "${2}" "${3}" # Token, repo
     ;;
   * )
     echo "Unknown command: ${CMD}"

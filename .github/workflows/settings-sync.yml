@@ -46,9 +46,23 @@ jobs:
         run: |
           custom_settings=$(./scripts.sh get_file_from_repo "${{ env.ACTIONS_TOKEN }}" "${{ matrix.repo }}" ".github-settings.json" || echo "{}")
 
-          echo $custom_settings > /tmp/custom_settings.json
+          echo $custom_settings > /tmp/custom_settings.raw.json
+
+          if [ "$(cat /tmp/custom_settings.raw.json | jq '.branch_protection.required_status_checks')" != "null" ]; then
+            echo "Branch protection settings in repo - do not overwrite"
+            mv /tmp/custom_settings.raw.json /tmp/custom_settings.json
+          else
+            echo "Apply default branch protection settings"
+
+            required_status_checks_raw=$(./scripts.sh get_required_status_checks "${{ env.ACTIONS_TOKEN }}" "${{ matrix.repo }}" || echo "{}")
+            required_status_checks=$(echo "${required_status_checks_raw}" | jq -rc 'to_entries | map(select(.key | in({"checks": 1, "strict": 1}))) | from_entries')
+
+            jq --argjson checks "${required_status_checks}" 'setpath(["branch_protection","required_status_checks"]; $checks)' /tmp/custom_settings.raw.json > /tmp/custom_settings.json
+          fi
 
           settings=$(jq -s '.[0] * .[1]' ./settings.json /tmp/custom_settings.json)
+
+          echo "${settings} | jq -r"
 
           echo "settings=$(echo "${settings}" | jq -rc)" >> "$GITHUB_OUTPUT"
           echo "apply_update=$(echo "${settings}" | jq -r '.ignore |= not | .ignore')" >> "$GITHUB_OUTPUT"
@@ -60,3 +74,8 @@ jobs:
             "${{ env.ACTIONS_TOKEN }}" \
             "${{ matrix.repo }}" \
             "$(echo '${{ steps.settings.outputs.settings }}' | jq -rc '.repo')"
+
+          ./scripts.sh apply_branch_protection \
+            "${{ env.ACTIONS_TOKEN }}" \
+            "${{ matrix.repo }}" \
+            "$(echo '${{ steps.settings.outputs.settings }}' | jq -rc '.branch_protection')"
