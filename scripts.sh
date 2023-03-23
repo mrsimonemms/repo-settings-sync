@@ -22,13 +22,23 @@ apply_branch_protection() {
 
   default_branch=$(get_default_branch "${TOKEN}" "${REPO}")
 
-  curl -fL \
+  # If on free tier and private repo, this will return a 403 error - accept and move on
+  http_code=$(curl -o /tmp/apply_branch_output -w "%{http_code}" -L \
     -X PUT \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: Bearer ${TOKEN}"\
     -H "X-GitHub-Api-Version: 2022-11-28" \
     "https://api.github.com/repos/${REPO}/branches/${default_branch}/protection" \
-    -d "${SETTINGS}"
+    -d "${SETTINGS}")
+
+  if [ "${http_code}" -eq 200 ]; then
+    echo "Settings successfully applied"
+  elif [ "${http_code}" -eq 403 ]; then
+    echo "Branch protection settings unavailable on private repos in the free tier"
+  else
+    echo "Failed to apply branch protection"
+    cat /tmp/apply_branch_output
+  fi
 }
 
 apply_repo_update() {
@@ -86,7 +96,7 @@ get_default_branch() {
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
-    "https://api.github.com/repos/${REPO}" | jq -r '.default_branch'
+    "https://api.github.com/repos/${REPO}" | jq -r '.default_branch' || echo "main"
 }
 
 get_file_from_repo() {
